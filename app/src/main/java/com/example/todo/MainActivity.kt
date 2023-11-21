@@ -177,9 +177,15 @@ fun CircularCheckbox(
         }
     }
 }
+
 @Composable
-fun ListCard (value: String) {
-    var check = remember { mutableStateOf<Boolean>(false) }
+fun EmptyMessage () {
+
+}
+
+@Composable
+fun ListCard (value: String, onRemove: () -> Unit) {
+    var check = rememberSaveable { mutableStateOf<Boolean>(false) }
 
     fun onChange () {
         check.value = !check.value
@@ -226,18 +232,24 @@ fun ListCard (value: String) {
                 .align(Alignment.CenterEnd)
                 .offset(x = (-10).dp)
                 .size(26.dp)
+                .clickable { onRemove() }
         )
     }
 }
 
+data class ListValue(val id: Int, val text: String)
 @Composable
 fun App() {
-    val listValue = remember { mutableStateListOf<String>() }
+    var list by rememberSaveable { mutableStateOf(emptyList<ListValue>()) }
 
     fun onSubmit (text: String) {
         if (text.trim().isNotEmpty()) {
-            listValue.add(text.trim())
+            list += ListValue(id = list.size, text = text.trim())
         }
+    }
+
+    fun onRemove (id: Number) {
+        list = list.filter { it.id != id }
     }
 
     Box(modifier = Modifier
@@ -266,11 +278,27 @@ fun App() {
                     .padding(20.dp, 0.dp)
                     .height(450.dp)
             ) {
-                items (listValue) { message ->
-                    ListCard(message)
+                items (list) { item ->
+                    ListCard(item.text, onRemove = { onRemove(item.id) })
                     Box(modifier = Modifier.height(10.dp))
                 }}
+        if (list.isEmpty()) {
+            Column(
+                modifier = Modifier
+                    .align(Alignment.Center),
+                horizontalAlignment = Alignment
+                    .CenterHorizontally) {
+                Text(
+                    text = "Você ainda não tem tarefas cadastradas",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.W600,
+                    color = Color(android.graphics.Color.parseColor("#808080")))
+                Text(
+                    text = "Crie tarefas e organize seus itens a fazer",
+                    color = Color(android.graphics.Color.parseColor("#808080")))
+            }
         }
+    }
     }
 
 @Preview(showBackground = true)
