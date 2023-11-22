@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
@@ -33,11 +34,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -184,10 +187,11 @@ fun EmptyMessage () {
 }
 
 @Composable
-fun ListCard (value: String, onRemove: () -> Unit) {
+fun ListCard (value: String, onRemove: () -> Unit, onClick: (Boolean) -> Unit) {
     var check = rememberSaveable { mutableStateOf<Boolean>(false) }
 
     fun onChange () {
+        onClick (check.value)
         check.value = !check.value
     }
 
@@ -237,18 +241,74 @@ fun ListCard (value: String, onRemove: () -> Unit) {
     }
 }
 
-data class ListValue(val id: Int, val text: String)
+enum class Type {
+    PRIMARY,
+    SECONDARY
+}
+@Composable
+fun Counter (number: Int, text: String, type: Type) {
+    Row (horizontalArrangement = Arrangement.Center){
+        when (type) {
+            Type.PRIMARY -> {
+                Text(
+                    "$text",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.W700,
+                    color = Color(android.graphics.Color.parseColor("#4EA8DE")))
+            }
+
+            Type.SECONDARY -> {
+                Text(
+                    "$text",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.W700,
+                    color = Color(android.graphics.Color.parseColor("#8284FA")))
+            }
+        }
+        Spacer(modifier = Modifier.width(10.dp))
+        Text(
+            text = "$number",
+            fontSize = 14.sp,
+            modifier = Modifier
+                .background(
+                    Color.DarkGray,
+                    shape = RoundedCornerShape(80)
+                )
+                .padding(10.dp, 2.dp),
+            color = Color.White)
+    }
+}
+
+@Composable
+fun HeaderList (creates: Int, completeds: Int) {
+    Row(modifier = Modifier.fillMaxWidth(),horizontalArrangement = Arrangement.SpaceBetween) {
+        Counter(creates, "Criadas", Type.PRIMARY)
+        Counter(completeds, "Concluídas", Type.SECONDARY)
+    }
+}
+
+data class ListValue(val id: Int, val text: String, val checked: Boolean)
 @Composable
 fun App() {
     var list by rememberSaveable { mutableStateOf(emptyList<ListValue>()) }
 
     fun onSubmit (text: String) {
         if (text.trim().isNotEmpty()) {
-            list += ListValue(id = list.size, text = text.trim())
+            list += ListValue(id = list.size, text = text.trim(), checked = false)
         }
     }
 
-    fun onRemove (id: Number) {
+    fun onCheck (id: Int, check: Boolean) {
+        list = list.map { item ->
+            if (item.id == id) {
+                item.copy(checked = !check)
+            } else {
+                item
+            }
+        }
+    }
+
+    fun onRemove (id: Int) {
         list = list.filter { it.id != id }
     }
 
@@ -262,26 +322,42 @@ fun App() {
             text = "To Do",
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .offset(y = (100).dp)
+                .offset(y = (60).dp)
         )
         InputAndButton ({ onSubmit(it) },
             Modifier
                 .fillMaxWidth()
                 .padding(20.dp, 0.dp)
                 .align(Alignment.TopCenter)
-                .offset(y = 200.dp) )
-            LazyColumn(
+                .offset(y = 130.dp) )
+
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .offset(y = (-50).dp)
+                    .offset(y = (-100).dp)
                     .fillMaxWidth()
                     .padding(20.dp, 0.dp)
                     .height(450.dp)
             ) {
-                items (list) { item ->
-                    ListCard(item.text, onRemove = { onRemove(item.id) })
-                    Box(modifier = Modifier.height(10.dp))
-                }}
+                HeaderList(list.size, list.filter {it.checked}.size )
+                Box(modifier = Modifier.height(30.dp))
+                if (list.isEmpty()) Box(modifier = Modifier
+                    .background(Color.DarkGray)
+                    .fillMaxWidth()
+                    .height((1.5).dp))
+                if (list.isNotEmpty()){
+
+                    LazyColumn() {
+                    items(list) { item ->
+                        ListCard(
+                            item.text,
+                            onRemove = { onRemove(item.id) },
+                            onClick = { onCheck(item.id, it) })
+                        Box(modifier = Modifier.height(10.dp))
+                    }
+                }
+            }
+        }
         if (list.isEmpty()) {
             Column(
                 modifier = Modifier
