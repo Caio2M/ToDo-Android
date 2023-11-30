@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.widget.ScrollView
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.scaleIn
 import androidx.compose.foundation.*
 import androidx.compose.foundation.gestures.Orientation
@@ -29,17 +30,20 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.VerticalAlignmentLine
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -51,7 +55,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import com.example.todo.ui.theme.ToDoTheme
+import kotlinx.coroutines.delay
 import java.util.Objects
+import java.util.UUID
 import kotlin.math.round
 
 class MainActivity : ComponentActivity() {
@@ -187,16 +193,31 @@ fun EmptyMessage () {
 }
 
 @Composable
-fun ListCard (value: String, onRemove: () -> Unit, onClick: (Boolean) -> Unit) {
-    var check = rememberSaveable { mutableStateOf<Boolean>(false) }
+fun ListCard (value: String, onRemove: () -> Unit, onClick: (Boolean) -> Unit, checked: Boolean) {
+    var ableToDelete by rememberSaveable { mutableStateOf(false) }
+    var timer by rememberSaveable { mutableStateOf(100) }
 
-    fun onChange () {
-        onClick (check.value)
-        check.value = !check.value
+    LaunchedEffect(key1 = timer, key2 = ableToDelete, block = {
+        if (ableToDelete) {
+            if (timer == 0) {
+                onRemove()
+                timer = 100
+                ableToDelete = false
+            }
+            for (n in 0..100) {
+                delay(1)
+                if (timer > 0) timer -= 10
+            }
+        }
+    })
+    
+    fun handleRemove () {
+        ableToDelete = true
     }
-
+    
     Box(modifier = Modifier
-        .clickable { onChange() }
+        .alpha((timer * 0.01).toFloat())
+        .clickable { onClick(checked) }
         .fillMaxWidth()
         .border(
             (1.5).dp,
@@ -211,16 +232,16 @@ fun ListCard (value: String, onRemove: () -> Unit, onClick: (Boolean) -> Unit) {
         .padding(10.dp, 0.dp)
     ){
         CircularCheckbox(
-            checked = check.value,
-            onCheckedChange = { onChange() } ,
+            checked = checked,
+            onCheckedChange = { onClick (checked) } ,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = 10.dp)
         )
         Text(
             text = value.trim(),
-            color = if (check.value) Color(android.graphics.Color.parseColor("#808080")) else Color.White,
-            textDecoration = if (check.value) TextDecoration.LineThrough else TextDecoration.None,
+            color = if (checked) Color(android.graphics.Color.parseColor("#808080")) else Color.White,
+            textDecoration = if (checked) TextDecoration.LineThrough else TextDecoration.None,
             modifier = Modifier
                 .align(Alignment.CenterStart)
                 .offset(x = 50.dp)
@@ -236,7 +257,7 @@ fun ListCard (value: String, onRemove: () -> Unit, onClick: (Boolean) -> Unit) {
                 .align(Alignment.CenterEnd)
                 .offset(x = (-10).dp)
                 .size(26.dp)
-                .clickable { onRemove() }
+                .clickable { handleRemove() }
         )
     }
 }
@@ -287,18 +308,18 @@ fun HeaderList (creates: Int, completeds: Int) {
     }
 }
 
-data class ListValue(val id: Int, val text: String, val checked: Boolean)
+data class ListValue(val id: String, val text: String, val checked: Boolean)
 @Composable
 fun App() {
     var list by rememberSaveable { mutableStateOf(emptyList<ListValue>()) }
 
     fun onSubmit (text: String) {
         if (text.trim().isNotEmpty()) {
-            list += ListValue(id = list.size, text = text.trim(), checked = false)
+            list += ListValue(id = "${UUID.randomUUID()}", text = text.trim(), checked = false)
         }
     }
 
-    fun onCheck (id: Int, check: Boolean) {
+    fun onCheck (id: String, check: Boolean) {
         list = list.map { item ->
             if (item.id == id) {
                 item.copy(checked = !check)
@@ -308,18 +329,18 @@ fun App() {
         }
     }
 
-    fun onRemove (id: Int) {
-        list = list.filter { it.id != id }
+    fun onRemove (id: String) {
+        list = list.filterNot { it.id == id }
     }
 
     Box(modifier = Modifier
         .fillMaxSize()
         .background(Color(android.graphics.Color.parseColor("#1A1A1A")))
     ) {
-        Text(
-            fontSize = 30.sp,
-            fontWeight = FontWeight.Bold,
-            text = "To Do",
+        Icon(
+            imageVector = ImageVector.vectorResource(id = R.drawable.logo),
+            contentDescription = null,
+            tint = Color.Unspecified,
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .offset(y = (60).dp)
@@ -352,7 +373,9 @@ fun App() {
                         ListCard(
                             item.text,
                             onRemove = { onRemove(item.id) },
-                            onClick = { onCheck(item.id, it) })
+                            onClick = { onCheck(item.id, it) },
+                            item.checked
+                            )
                         Box(modifier = Modifier.height(10.dp))
                     }
                 }
